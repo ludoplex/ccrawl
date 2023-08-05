@@ -39,10 +39,7 @@ def id_amoco(s):
 
 def fieldformat(r):
     t = r.lbase
-    if r.is_ptr:
-        rt = "P"
-    else:
-        rt = tostruct.get(t, None)
+    rt = "P" if r.is_ptr else tostruct.get(t, None)
     if rt is None:
         t = id_amoco(t)
     if r.dim > 0:
@@ -73,9 +70,9 @@ def cTypedef_amoco(obj, db, recursive):
             pre = x.show(db, recursive, form="amoco")
             pre += "\n\n"
         else:
-            secho("identifier {} not found".format(t.lbase), fg="red", err=True)
+            secho(f"identifier {t.lbase} not found", fg="red", err=True)
     rn, n = fieldformat(t)
-    return u"{}TypeDefine('{}','{}')".format(pre, obj.identifier, rn or n)
+    return f"{pre}TypeDefine('{obj.identifier}','{rn or n}')"
 
 
 def cMacro_amoco(obj, db, recursive):
@@ -85,7 +82,7 @@ def cMacro_amoco(obj, db, recursive):
         return "{} = 0x{:x}".format(obj.identifier, v)
     except ValueError:
         pass
-    return "{} = '{}'".format(obj.identifier, v)
+    return f"{obj.identifier} = '{v}'"
 
 
 def cFunc_amoco(obj, db, recursive):
@@ -94,8 +91,8 @@ def cFunc_amoco(obj, db, recursive):
 
 def cEnum_amoco(obj, db, recursive):
     n = obj.identifier.replace(" ", "_")
-    s = ["TypeDefine('{}','i')".format(n)]
-    s.extend(("{} = {}".format(k, v) for (k, v) in obj.items()))
+    s = [f"TypeDefine('{n}','i')"]
+    s.extend(f"{k} = {v}" for (k, v) in obj.items())
     return "\n".join(s)
 
 
@@ -114,7 +111,7 @@ def cStruct_amoco(obj, db, recursive):
     name = id_amoco(obj.identifier)
     cls = "UnionDefine" if obj._is_union else "StructDefine"
     R = []
-    S = ['@{}("""\n'.format(cls)]
+    S = [f'@{cls}("""\n']
     for i in obj:
         t, n, c = i
         r = c_type(t)
@@ -126,31 +123,28 @@ def cStruct_amoco(obj, db, recursive):
                 q &= where("src") == obj.identifier
             if db.contains(q):
                 x = obj.from_db(db.get(q))
-                if x._is_typedef:
-                    pass
                 x = x.show(db, recursive, form="amoco")
                 x = x.split("\n")
-                for xrl in x:
-                    if xrl:
-                        R.append(xrl + "\n")
+                R.extend(xrl + "\n" for xrl in x if xrl)
                 recursive.add(r.lbase)
             else:
-                secho("identifier %s not found" % r.lbase, fg="red", err=True)
+                secho(f"identifier {r.lbase} not found", fg="red", err=True)
         rt, t = fieldformat(r)
         if rt:
             t = rt
         if c and c.count("\n") > 0:
             c = None
-        S.append("{} : {} ;{}\n".format(t, n, c or ""))
-    if len(R) > 0:
+        S.append(f'{t} : {n} ;{c or ""}\n')
+    if R:
         R.append("\n")
-    S.append('""")\nclass %s(StructFormatter):' % name)
-    # add methods:
-    S.append(
-        """
+    S.extend(
+        (
+            '""")\nclass %s(StructFormatter):' % name,
+            """
     def __init__(self,data="",offset=0):
         if data: self.unpack(data,offset)
-    """
+    """,
+        )
     )
     return "".join(R) + "".join(S)
 

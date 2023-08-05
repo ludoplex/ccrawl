@@ -11,7 +11,7 @@ with open("configuration.rst","w") as f:
 
     for o in conf.__dict__.values():
         try:
-            if 'Configurable' == o.mro()[1].__name__:
+            if o.mro()[1].__name__ == 'Configurable':
                 f.write(class_config_rst_doc(o,D))
                 f.write('\n')
         except Exception:

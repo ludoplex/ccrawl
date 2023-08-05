@@ -83,10 +83,7 @@ class Proxy(object):
         (on the filtered by self.tag set of document from remote if present
         otherwise local.)
         """
-        if q is None:
-            q = self.tag
-        else:
-            q = self.tag & q
+        q = self.tag if q is None else self.tag & q
         for k in kargs:
             q &= where(k) == kargs[k]
         if self.rdb and not self.c.localonly:
@@ -115,8 +112,8 @@ class Proxy(object):
         """
         D = {}
         for e in self.ldb.search(self.tag):
-            k = "%s := %s" % (e["id"], e["val"])
-            if not k in D:
+            k = f'{e["id"]} := {e["val"]}'
+            if k not in D:
                 D[k] = [e.doc_id]
             else:
                 D[k].append(e.doc_id)
@@ -182,32 +179,29 @@ class MongoDB(object):
         self.db = self.client.get_database("ccrawl")
 
     def __repr__(self):
-        return u"<MongoDB [%s]>" % self.url
+        return f"<MongoDB [{self.url}]>"
 
     def _where(self, q):
         "Translate a TinyDB.Query into a MongoDB request"
-        res = dict()
+        res = {}
         if len(q) > 1:
             op = q[0]
-            if op == "exists":
-                res[q[1][0]] = {"$exists": True}
-            elif op == "==":
+            if op == "==":
                 l, r = q[1][0], q[2]
                 res[l] = r
+            elif op == "and":
+                for x in q[1]:
+                    res |= self._where(x)
+            elif op == "exists":
+                res[q[1][0]] = {"$exists": True}
             elif op == "matches":
                 l, r = q[1][0], q[2]
-                if l in ("val", "use"):
-                    res[l] = {"$all": [r]}
-                else:
-                    res[l] = {"$regex": r}
+                res[l] = {"$all": [r]} if l in ("val", "use") else {"$regex": r}
+            elif op == "or":
+                res["$or"] = [self._where(x) for x in q[1]]
             elif op == "search":
                 l, r = q[1][0], q[2]
                 res[l] = {"$regex": r}
-            elif op == "and":
-                for x in q[1]:
-                    res.update(self._where(x))
-            elif op == "or":
-                res["$or"] = [self._where(x) for x in q[1]]
         return res
 
     def insert_multiple(self, docs):
@@ -275,10 +269,10 @@ class MongoDB(object):
             L.append(s["_id"])
             if s["cls"] == "cStruct":
                 S.append(s["_id"])
-        if len(S) > 0:
+        if S:
             self.db["structs_ptr32"].delete_many({"_id": {"$in": S}})
             self.db["structs_ptr64"].delete_many({"_id": {"$in": S}})
-        if len(L) > 0:
+        if L:
             self.db["nodes"].delete_many({"_id": {"$in": L}})
 
     def update_structs(self, proxydb, req=None):
@@ -295,7 +289,7 @@ class MongoDB(object):
         s_32 = self.db["structs_ptr32"]
         s_64 = self.db["structs_ptr64"]
         for s in col.find(req):
-            click.echo("updating {}".format(s["id"]))
+            click.echo(f'updating {s["id"]}')
             i = s["_id"]
             x = ccore.from_db(s)
             try:

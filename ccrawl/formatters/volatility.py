@@ -16,7 +16,7 @@ __all__ = [
 
 
 def cMacro_volatility(obj, db, recursive):
-    return u"{} = {}".format(obj.identifier, obj)
+    return f"{obj.identifier} = {obj}"
 
 
 def cFunc_volatility(obj, db, recursive):
@@ -28,15 +28,15 @@ def ctype_to_volatility(t):
     if b not in struct_letters:
         res = b.replace("?_", "").replace(" ", "_")
         if res.startswith("struct_") or res.startswith("union_"):
-            res = "['{}']".format(res)
+            res = f"['{res}']"
     else:
         t.lconst = False  # const keyword not supported by volatility
-        res = "['{}']".format(t.show_base())
+        res = f"['{t.show_base()}']"
     for p in t.pstack:
         if isinstance(p, arr):
             res = "['array', %d, %s]" % (p.a, res)
         elif isinstance(p, ptr):
-            res = "['pointer', %s]" % res
+            res = f"['pointer', {res}]"
         else:
             # prototypes are ignored...
             res = "['void']"
@@ -46,16 +46,16 @@ def ctype_to_volatility(t):
 def cTypedef_volatility(obj, db, recursive):
     obj.unfold(db)
     t = c_type(obj)
-    S = [u"{} = {}".format(obj.identifier, ctype_to_volatility(t))]
+    S = [f"{obj.identifier} = {ctype_to_volatility(t)}"]
     R = []
     if isinstance(recursive, set):
         for t in obj.subtypes.values() or []:
             if t is None:
                 continue
-            if not t.identifier in recursive:
+            if t.identifier not in recursive:
                 recursive.add(t.identifier)
                 R.append(t.show(db, recursive, form="volatility"))
-        if len(R) > 0:
+        if R:
             R.append("")
     return u"\n".join(R + S)
 
@@ -84,10 +84,10 @@ def cStruct_volatility(obj, db, recursive):
         for t in obj.subtypes.values() or []:
             if t is None:
                 continue
-            if not t.identifier in recursive:
+            if t.identifier not in recursive:
                 recursive.add(t.identifier)
                 R.append(t.show(db, recursive, form="volatility"))
-        if len(R) > 0:
+        if R:
             R.append("")
     return u"\n".join(R + S)
 

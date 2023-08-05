@@ -12,7 +12,7 @@ def test_Proxy_tinydb(configfile, db_doc1, db_doc2):
     assert type(db.ldb).__name__ == "TinyDB"
     assert db.ldb.storage.__class__.__name__ == "MemoryStorage"
     assert db.rdb is None
-    assert len(list(db.ldb)) == 0
+    assert not list(db.ldb)
     db.ldb.insert(db_doc1)
     assert db.ldb.contains(where("id") == "xxx")
     db.insert_multiple(db_doc2)

@@ -16,7 +16,7 @@ def test_ctypes_01(dbfile):
             "None",
             "collect",
             "--clang",
-            '"-I%s/samples"' % inc,
+            f'"-I{inc}/samples"',
             os.path.join(
                 inc,
                 "samples/header.h",

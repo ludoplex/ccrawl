@@ -28,7 +28,7 @@ def cTypedef_C(obj, db, recursive):
             x = obj.from_db(db.get(Q))
             pre = x.show(db, recursive, form="C") + "\n"
         else:
-            secho("//identifier %s not found" % t.lbase, fg="red", err=True)
+            secho(f"//identifier {t.lbase} not found", fg="red", err=True)
     # if t base is an anonymous type, we replace its anon name
     # by its struct/union definition in t:
     if recursive and "?_" in t.lbase:
@@ -36,22 +36,23 @@ def cTypedef_C(obj, db, recursive):
         t.lbase = pre.pop().strip(";\n")
         pre.append("")
         pre = "\n\n".join(pre)
-    return u"{}typedef {};".format(pre, t.show(obj.identifier))
+    return f"{pre}typedef {t.show(obj.identifier)};"
 
 
 def cMacro_C(obj, db, recursive):
-    return u"#define {} {};".format(obj.identifier, obj)
+    return f"#define {obj.identifier} {obj};"
 
 
 def cFunc_C(obj, db, recursive):
     fptr = c_type(obj["prototype"])
-    return fptr.show(obj.identifier) + ";"
+    return f"{fptr.show(obj.identifier)};"
 
 
 def cEnum_C(obj, db, recursive):
-    S = []
-    for k, v in sorted(obj.items(), key=lambda t: t[1]):
-        S.append("  {} = {:d}".format(k, v))
+    S = [
+        "  {} = {:d}".format(k, v)
+        for k, v in sorted(obj.items(), key=lambda t: t[1])
+    ]
     S = ",\n".join(S)
     name = re.sub(r"\?_.*", "", obj.identifier)
     return u"%s {\n%s\n};" % (name, S)
@@ -64,7 +65,7 @@ def cStruct_C(obj, db, recursive):
     if isinstance(recursive, set):
         # if we are on a loop, just declare the struct name:
         if name in recursive:
-            return "%s;" % name
+            return f"{name};"
         Q = True
         recursive.update(struct_letters)
         recursive.add(name)
@@ -92,7 +93,7 @@ def cStruct_C(obj, db, recursive):
         # query field element base type if recursive:
         # check if we are about to query the current struct type...
         if Q and (r.lbase == obj.identifier):
-            R.append("%s;" % r.lbase)
+            R.append(f"{r.lbase};")
         elif Q and (r.lbase not in recursive):
             # prepare query
             # (deal with the case of querying an anonymous type)
@@ -103,7 +104,7 @@ def cStruct_C(obj, db, recursive):
             if db.contains(q):
                 # retreive the field type:
                 x = obj.from_db(db.get(q)).show(db, recursive, form="C")
-                if not "?_" in r.lbase:
+                if "?_" not in r.lbase:
                     # if not anonymous, insert it directly in R
                     # R.insert(0,x)
                     R.append(x)
@@ -120,11 +121,11 @@ def cStruct_C(obj, db, recursive):
                                 # R.insert(0,xrl)
                                 R.append(xrl)
             else:
-                secho("//identifier %s not found" % r.lbase, fg="red", err=True)
+                secho(f"//identifier {r.lbase} not found", fg="red", err=True)
         # finally add field type and name to the structure lines:
-        S.append(u"  {};".format(r.show(n)))
+        S.append(f"  {r.show(n)};")
     # join R and S:
-    if len(R) > 0:
+    if R:
         R.append("\n")
     S.append("};")
     return "\n".join(R) + "\n".join(S)
@@ -171,14 +172,14 @@ def cClass_C(obj, db, recursive):
         elif qal == "using":
             # inherited type of attribute from parent is provided as a list in t:
             what = "::".join((cxx_type(u).show_base(kw=False) for u in t))
-            using = "  using %s" % what
+            using = f"  using {what}"
             # inherited name of attribute from parent is provided in n:
             # we append the attribute name unless its the class constructor
-            using += "::%s;" % n if n != classname else ";"
+            using += f"::{n};" if n != classname else ";"
             S.append(using)
             continue
         elif qal.startswith("template<"):
-            P[p].append("    " + qal)
+            P[p].append(f"    {qal}")
             qal = ""
         # decompose C-type t into specific parts:
         r = cxx_type(t)
@@ -204,7 +205,7 @@ def cClass_C(obj, db, recursive):
                     R.append(x)
                     recursive.add(e)
                 else:
-                    x = x.replace("%s::" % classname, "")
+                    x = x.replace(f"{classname}::", "")
                     # nested struct/union/class: we need to transfer
                     # any predefs into R
                     x = x.split("\n\n")
@@ -215,23 +216,22 @@ def cClass_C(obj, db, recursive):
                             if xrl and xrl not in R:
                                 R.append(xrl)
             else:
-                secho("//identifier %s not found" % r.lbase, fg="red", err=True)
+                secho(f"//identifier {r.lbase} not found", fg="red", err=True)
         # finally add field type and name to the structure lines:
         fo = ""
         if qal:
             if "," in qal:
                 qal, fo = qal.split(",")
-            qal = "%s " % qal
+            qal = f"{qal} "
         P[p].append(u"    {}{}{};".format(qal, r.show(n, kw=nested), fo))
     # access specifier (empty is for friend members):
     for p in ("PUBLIC", "PROTECTED", "PRIVATE", ""):
         if len(P[p]) > 0:
             if p:
-                S.append("  %s:" % p.lower())
-            for v in P[p]:
-                S.append(v)
+                S.append(f"  {p.lower()}:")
+            S.extend(iter(P[p]))
     # join R and S:
-    if len(R) > 0:
+    if R:
         R.append("\n")
     S.append("};")
     return "\n".join(R) + "\n".join(S)
@@ -252,12 +252,9 @@ def cTemplate_C(obj, db, recursive):
             if t.startswith("typename "):
                 t = t.replace("typename ", "")
                 recursive.add(t)
-    else:
-        # Q = None
-        pass
     R = []
     # S holds template output lines:
-    S = [u"template%s" % template]
+    S = [f"template{template}"]
     if "cClass" in obj:
         from ccrawl.core import cClass
 

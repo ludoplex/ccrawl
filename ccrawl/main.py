@@ -29,7 +29,7 @@ def spawn_console(ctx):
     if not ctx.obj["db"]:
         ctx.obj["db"] = Proxy(c.Database)
     cvars = dict(globals(), **locals())
-    cvars.update(ctx.obj)
+    cvars |= ctx.obj
     if c.Terminal.console.lower() == "ipython":
         try:
             from IPython import start_ipython
@@ -99,16 +99,16 @@ def cli(ctx, verbose, quiet, db, local, configfile, tag):
     c.Terminal.width = shutil.get_terminal_size()[0]
     if conf.VERBOSE:
         if c.src:
-            click.echo("config file '%s' loaded" % c.f)
+            click.echo(f"config file '{c.f}' loaded")
         else:
-            click.echo("default config loaded (file '%s' not found)" % c.f)
+            click.echo(f"default config loaded (file '{c.f}' not found)")
     if db:
         c.Database.url = db
     if local:
         c.Database.local = local
         c.Database.localonly = True
     if conf.VERBOSE:
-        click.echo("loading local database %s ..." % c.Database.local, nl=False)
+        click.echo(f"loading local database {c.Database.local} ...", nl=False)
     try:
         ctx.obj["db"] = Proxy(c.Database)
         ctx.obj["tag"] = tag
@@ -120,10 +120,10 @@ def cli(ctx, verbose, quiet, db, local, configfile, tag):
     if conf.VERBOSE:
         click.echo("done")
         if c.Database.url and ctx.obj["db"].rdb:
-            click.echo("remote database is: %s" % c.Database.url)
+            click.echo(f"remote database is: {c.Database.url}")
         elif c.Database.url:
             click.secho(
-                "remote database (%s) not connected" % c.Database.url,
+                f"remote database ({c.Database.url}) not connected",
                 fg="red",
                 err=True,
             )
@@ -131,9 +131,8 @@ def cli(ctx, verbose, quiet, db, local, configfile, tag):
             click.echo("no remote database")
     if ctx.invoked_subcommand is None:
         spawn_console(ctx)
-    else:
-        if conf.DEBUG:
-            click.echo("COMMAND: %s" % ctx.invoked_subcommand)
+    elif conf.DEBUG:
+        click.echo(f"COMMAND: {ctx.invoked_subcommand}")
 
 
 # collect command:
@@ -184,18 +183,16 @@ def collect(ctx, allc, types, functions, macros, strict, recon, xclang, outgraph
     """
     # take into account options in config:
     c = conf.config
-    K = None
     c.Collect.strict |= strict
     c.Collect.allc |= allc
     c.Collect.cxx &= not nocxx
-    if types or functions or macros:
-        K = []
-        if types:
-            K += [TYPEDEF_DECL, STRUCT_DECL, UNION_DECL, CLASS_DECL, ENUM_DECL]
-        if functions:
-            K += [FUNCTION_DECL]
-        if macros:
-            K += [MACRO_DEF]
+    K = [] if types or functions or macros else None
+    if types:
+        K += [TYPEDEF_DECL, STRUCT_DECL, UNION_DECL, CLASS_DECL, ENUM_DECL]
+    if functions:
+        K += [FUNCTION_DECL]
+    if macros:
+        K += [MACRO_DEF]
     # set tag value:
     tag = ctx.obj["tag"]
     if ctx.obj["tag"] is None:
@@ -218,10 +215,11 @@ def collect(ctx, allc, types, functions, macros, strict, recon, xclang, outgraph
     if outgraph:
         L = ["digraph ccrawl {"]
         for g in G.C:
-            for v in g.V():
-                L.append('"%s"'%v.data)
-            for e in g.E():
-                L.append('"%s" -> "%s" [label="%s"]'%(e.v[0].data,e.v[1].data,e.data))
+            L.extend(f'"{v.data}"' for v in g.V())
+            L.extend(
+                f'"{e.v[0].data}" -> "{e.v[1].data}" [label="{e.data}"]'
+                for e in g.E()
+            )
         L.append('}')
         with open(outgraph,"w") as dot:
             dot.write('\n'.join(L))
@@ -232,7 +230,7 @@ def collect(ctx, allc, types, functions, macros, strict, recon, xclang, outgraph
     W = c.Terminal.width - 12
     # parse and collect all sources:
     n = 0
-    for filename,directives in FILES.items():
+    for filename, directives in FILES.items():
         t0 = time.time()
         if not c.Terminal.quiet:
             n += 1
@@ -250,7 +248,7 @@ def collect(ctx, allc, types, functions, macros, strict, recon, xclang, outgraph
             return -1
         if len(l) > 0:
             # remove already processed/included files
-            already_done.union(set([el["src"] for el in l]))
+            already_done.union({el["src"] for el in l})
             # aggregate cFunc instances and remove duplicates in dbo:
             for x in l:
                 if x["cls"] == "cFunc":
@@ -301,7 +299,7 @@ def preprocess_files(src,args,cxx=False,allc=False):
         if os.path.isdir(D):
             for dirname, subdirs, files in os.walk(D.rstrip("/")):
                 for f in filter(F, files):
-                    filename = "%s/%s" % (dirname, f)
+                    filename = f"{dirname}/{f}"
                     FILES.add(filename)
         elif os.path.isfile(D) and F(D):
             FILES.add(D)
@@ -343,9 +341,9 @@ def search(ctx, ignorecase, rex):
     L = db.search(db.tag & Q)
     for l in L:
         click.echo("found ", nl=False)
-        click.secho("%s " % l["cls"], nl=False, fg="cyan")
+        click.secho(f'{l["cls"]} ', nl=False, fg="cyan")
         click.echo("identifer ", nl=False)
-        click.secho('"%s"' % l["id"], nl=False, fg="magenta")
+        click.secho(f'"{l["id"]}"', nl=False, fg="magenta")
         if look(l["val"]):
             click.echo(" with matching value", nl=False)
         click.echo("")
@@ -382,14 +380,13 @@ def select(ctx, ands, ors, key):
         L = db.search(db.tag & Q)
         for l in L:
             click.echo("found ", nl=False)
-            click.secho("%s " % l["cls"], nl=False, fg="cyan")
+            click.secho(f'{l["cls"]} ', nl=False, fg="cyan")
             click.echo("identifer ", nl=False)
-            click.secho('"%s"' % l["id"], fg="magenta")
+            click.secho(f'"{l["id"]}"', fg="magenta")
             for k in key:
                 click.echo("  .%06s: %s"%(k,l.get(k,"")))
-    else:
-        if conf.DEBUG:
-            click.echo("SELECT_COMMAND: %s" % ctx.invoked_subcommand)
+    elif conf.DEBUG:
+        click.echo(f"SELECT_COMMAND: {ctx.invoked_subcommand}")
 
 
 @select.command()
@@ -421,9 +418,8 @@ def prototype(ctx, proto):
             P.insert(0, c_type(x.restype()).show())
             if max(reqs) >= len(P):
                 continue
-            if not all(((t == P[i]) for (i, t) in reqs.items())):
-                continue
-            R.append(x.show(db, form="C"))
+            if all(((t == P[i]) for (i, t) in reqs.items())):
+                R.append(x.show(db, form="C"))
     if R:
         click.echo("\n".join(R))
 
@@ -449,7 +445,7 @@ def constant(ctx, mask, symbol, val):
         for l in pL:
             x = ccore.from_db(l)
             if x._is_macro:
-                if not (symbol in x.identifier):
+                if symbol not in x.identifier:
                     continue
                 try:
                     v = int(x, 0)
@@ -458,9 +454,9 @@ def constant(ctx, mask, symbol, val):
                 else:
                     if v == value:
                         R.append(x.identifier + "\n")
-                    elif mask and (symbol in x.identifier):
+                    elif mask:
                         if v < value and v & value:
-                            R.append(x.identifier + " | ")
+                            R.append(f"{x.identifier} | ")
             else:
                 for k, v in x.items():
                     if v == value and (symbol in k):
@@ -468,7 +464,7 @@ def constant(ctx, mask, symbol, val):
                         break
                     elif mask and (symbol in k):
                         if v < value and v & value:
-                            R.append(k + " | ")
+                            R.append(f"{k} | ")
     if R:
         s = "".join(R)
         click.echo(s.strip(" |\n"))
@@ -523,7 +519,7 @@ def struct(ctx, pdef, pointer, conds):
                 F,SZ = zip(*(t.offsets(psize=pointer)))
                 xsize = t.size(psize=pointer)
             except Exception as e:
-                fails.append("can't build %s (error: %s)" % (x.identifier,str(e)))
+                fails.append(f"can't build {x.identifier} (error: {str(e)})")
                 continue
             if F:
                 if "*" in reqs and reqs["*"] != xsize:
@@ -550,10 +546,7 @@ def struct(ctx, pdef, pointer, conds):
                     if not cond:
                         break
                 if all(ok):
-                    if not pdef:
-                        res = name
-                    else:
-                        res = x.show(db, False, form="C")+"\n"
+                    res = name if not pdef else x.show(db, False, form="C")+"\n"
                     R.append(res)
     if conf.VERBOSE:
         click.secho("\n".join(fails), fg="red", err=True)
@@ -596,7 +589,7 @@ def show(ctx, form, recursive, identifier):
             x = ccore.from_db(l)
             click.echo(x.show(db, recursive, form=form))
     else:
-        click.secho("identifier '%s' not found" % identifier, fg="red", err=True)
+        click.secho(f"identifier '{identifier}' not found", fg="red", err=True)
 
 
 # info command:

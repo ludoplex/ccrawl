@@ -7,7 +7,7 @@ __all__ = ["ccore_raw"]
 
 
 def ccore_raw(obj, db, recursive):
-    return "{}:\n{}".format(obj.identifier, pprint.pformat(obj))
+    return f"{obj.identifier}:\n{pprint.pformat(obj)}"
 
 
 default = ccore_raw

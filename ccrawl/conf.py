@@ -130,10 +130,11 @@ class Config(object):
         for c in filter(
             lambda x: isinstance(getattr(self, x), Configurable), dir(self)
         ):
-            pfx = "c.%s" % c
+            pfx = f"c.{c}"
             c = getattr(self, c)
-            for t in c.trait_names():
-                if t in ("config", "parent"):
-                    continue
-                s.append("{}.{}: {}".format(pfx, t, getattr(c, t)))
+            s.extend(
+                f"{pfx}.{t}: {getattr(c, t)}"
+                for t in c.trait_names()
+                if t not in ("config", "parent")
+            )
         return u"\n".join(s)

@@ -8,12 +8,12 @@ import ctypes
 def mk_ctypes(t, Types):
     i = t.lbase
     if t.lunsigned:
-        i = "unsigned " + i
+        i = f"unsigned {i}"
     r = toCTypes.get(i, i.replace("?_", "").replace(" ", "_"))
     P = t.pstack[:]
     if r in ("c_void", "c_char", "c_wchar") and t.is_ptr:
         if P[0].is_ptr:
-            r = r + "_p"
+            r = f"{r}_p"
             P.pop(0)
     if r == "c_void":
         r = None
@@ -24,7 +24,7 @@ def mk_ctypes(t, Types):
             r = Types[r]
         except KeyError:
             if not conf.QUIET:
-                secho("type {} not in database ? (replaced by int)".format(r), fg="red")
+                secho(f"type {r} not in database ? (replaced by int)", fg="red")
             r = ctypes.c_int
     while P:
         p = P.pop(0)
@@ -47,7 +47,7 @@ def formatproto(res, proto, Types):
     return ctypes.CFUNCTYPE(res, *params)
 
 def get_c_or_cxx_type(x):
-    if not ('&' in x):
+    if '&' not in x:
         try:
             t = c_type(x)
         except pp.ParseException:
@@ -108,9 +108,7 @@ def build(obj, db, Types={}, _bstack=[]):
     elif obj._is_func:
         Types[x] = mk_ctypes(get_c_or_cxx_type(obj["prototype"]), Types)
     elif obj._is_struct or obj._is_union:
-        parent = ctypes.Structure
-        if obj._is_union:
-            parent = ctypes.Union
+        parent = ctypes.Union if obj._is_union else ctypes.Structure
         Types[x] = S = type(x, (parent,), {})
         if not early_exit:
             fmt = []
@@ -129,7 +127,7 @@ def build(obj, db, Types={}, _bstack=[]):
                     fmt.append((str(n), r, bfw))
                 else:
                     fmt.append((str(n), r))
-            if len(anon) > 0:
+            if anon:
                 S._anonymous_ = tuple(anon)
             S._fields_ = fmt
     else:

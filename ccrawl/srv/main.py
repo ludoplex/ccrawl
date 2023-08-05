@@ -22,20 +22,14 @@ g_ctx = None
 class Tags(Resource):
     def get(self):
         db = g_ctx.obj["db"]
-        L = set()
-        for l in db.search():
-            if "tag" in l:
-                L.add(l["tag"])
+        L = {l["tag"] for l in db.search() if "tag" in l}
         return [{"tag": t} for t in L]
 
 
 class Sources(Resource):
     def get(self):
         db = g_ctx.obj["db"]
-        L = set()
-        for l in db.search():
-            if "src" in l:
-                L.add(l["src"])
+        L = {l["src"] for l in db.search() if "src" in l}
         return [{"src": s} for s in L]
 
 
@@ -202,7 +196,7 @@ class Select_Prototype(Resource):
             P.insert(0, c_type(x.restype()).show())
             if max(reqs) >= len(P):
                 continue
-            if not all(((t == P[i]) for (i, t) in reqs.items())):
+            if any(t != P[i] for (i, t) in reqs.items()):
                 continue
             d = {"id": l["id"], "val": x.show(db, form=fmt)}
             if verbose:
@@ -264,9 +258,9 @@ class Select_Constant(Resource):
                 else:
                     if v == value:
                         out = x.identifier
-                    elif mask and (pfx in x.identifier):
+                    elif mask:
                         if v < value and v & value:
-                            out = x.identifier + " | "
+                            out = f"{x.identifier} | "
             else:
                 for k, v in x.items():
                     if v == value and (pfx in k):
@@ -274,7 +268,7 @@ class Select_Constant(Resource):
                         break
                     elif mask and (pfx in k):
                         if v < value and v & value:
-                            out = k + " | "
+                            out = f"{k} | "
             if out:
                 d = {"val": out}
                 if verbose:
@@ -356,7 +350,7 @@ class Select_Struct(Resource):
                 xsize = F[-1][0] + F[-1][1]
                 if "*" in reqs and reqs["*"] != xsize:
                     continue
-                F = dict(((f[0], f[1:3]) for f in F))
+                F = {f[0]: f[1:3] for f in F}
                 ok = []
                 for o, s in reqs.items():
                     if o == "*":
@@ -377,10 +371,7 @@ class Select_Struct(Resource):
                     if not cond:
                         break
                 if all(ok):
-                    if not pdef:
-                        out = x.identifier
-                    else:
-                        out = x.show(db, form=fmt)
+                    out = x.identifier if not pdef else x.show(db, form=fmt)
             if out:
                 d = {"val": out}
                 if verbose:

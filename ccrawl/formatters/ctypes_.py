@@ -38,28 +38,26 @@ toCTypes = {
 def id_ctypes(t):
     i = t.lbase
     if t.lunsigned:
-        i = "unsigned " + i
+        i = f"unsigned {i}"
     r = toCTypes.get(i, i.replace("?_", "").replace(" ", "_"))
     P = t.pstack[:]
     if r in ("c_void", "c_char", "c_wchar") and t.is_ptr:
         if P[0].is_ptr:
-            r = r + "_p"
+            r = f"{r}_p"
             P.pop(0)
     while P:
         p = P.pop(0)
         if p.is_ptr:
             for _ in p.p:
-                r = "POINTER(%s)" % r
+                r = f"POINTER({r})"
         elif isinstance(p, fargs):
             r = formatproto(r, p)
             x = P.pop(0)
             assert x.is_ptr
-            r = "POINTER(%s)" % r
+            r = f"POINTER({r})"
         else:
             r = "%s*%d" % (r, p.a)
-    if r == "c_void":
-        return "None"
-    return r
+    return "None" if r == "c_void" else r
 
 
 def formatproto(res, proto):
@@ -68,7 +66,7 @@ def formatproto(res, proto):
     if res == "c_void":
         res = "None"
     params.insert(0, res)
-    return "{}({})".format(f, ", ".join(params))
+    return f'{f}({", ".join(params)})'
 
 
 def cTypedef_ctypes(obj, db, recursive):
@@ -81,8 +79,8 @@ def cTypedef_ctypes(obj, db, recursive):
             pre = x.show(db, recursive, form="ctypes")
             pre += "\n\n"
         else:
-            secho("identifier %s not found" % t.lbase, fg="red", err=True)
-    return u"{}{} = {}".format(pre, obj.identifier, id_ctypes(t))
+            secho(f"identifier {t.lbase} not found", fg="red", err=True)
+    return f"{pre}{obj.identifier} = {id_ctypes(t)}"
 
 
 def cMacro_ctypes(obj, db, recursive):
@@ -91,7 +89,7 @@ def cMacro_ctypes(obj, db, recursive):
         v = int(v, base=0)
     except ValueError:
         pass
-    return "{} = {}".format(obj.identifier, v)
+    return f"{obj.identifier} = {v}"
 
 
 def cFunc_ctypes(obj, db, recursive):
@@ -109,19 +107,19 @@ def cFunc_ctypes(obj, db, recursive):
                     pre = x.show(db, recursive, form="ctypes")
                     pre += "\n\n"
                 else:
-                    secho("identifier %s not found" % t.lbase, fg="red", err=True)
+                    secho(f"identifier {t.lbase} not found", fg="red", err=True)
     params = [id_ctypes(c_type(x)) for x in args]
     res = id_ctypes(c_type(res))
     if res == "c_void":
         res = "None"
     params.insert(0, res)
-    return "{} = {}({})".format(obj.identifier, f, ", ".join(params))
+    return f'{obj.identifier} = {f}({", ".join(params)})'
 
 
 def cEnum_ctypes(obj, db, recursive):
     n = obj.identifier.replace(" ", "_")
-    S = ["{} = c_int".format(n)]
-    S.extend(("{} = {}".format(k, v) for (k, v) in obj.items()))
+    S = [f"{n} = c_int"]
+    S.extend(f"{k} = {v}" for (k, v) in obj.items())
     return "\n".join(S)
 
 
@@ -138,9 +136,8 @@ def cStruct_ctypes(obj, db, recursive):
     else:
         Q = None
     anon = []
-    S = []
-    fld = "%s._fields_ = [" % name
-    S.append(fld)
+    fld = f"{name}._fields_ = ["
+    S = [fld]
     pad = " " * len(fld)
     padded = False
     for i in obj:
@@ -151,7 +148,7 @@ def cStruct_ctypes(obj, db, recursive):
         if Q and (r.lbase not in recursive):
             q = db.tag & (where("id") == r.lbase)
             if "?_" in r.lbase:
-                anon.append('"%s"' % n)
+                anon.append(f'"{n}"')
                 q &= where("src") == obj.identifier
             if db.contains(q):
                 x = obj.from_db(db.get(q)).show(db, recursive, form="ctypes")
@@ -163,16 +160,16 @@ def cStruct_ctypes(obj, db, recursive):
                         R.append(xrl + "\n")
                 recursive.add(r.lbase)
             else:
-                secho("identifier %s not found" % r.lbase, fg="red", err=True)
+                secho(f"identifier {r.lbase} not found", fg="red", err=True)
         t = id_ctypes(r)
         if r.lbfw:
             t += ", %d" % r.lbfw
-        S.append('("{}", {}),\n'.format(n, t) + pad)
+        S.append(f'("{n}", {t}),\n{pad}')
         padded = True
     if padded:
         S.append(S.pop().strip()[:-1])
     S.append("]")
-    if len(anon) > 0:
+    if anon:
         S.insert(0, "%s._anonymous_ = (%s,)\n" % (name, ",".join(anon)))
     return "".join(R) + "\n" + "".join(S)
 

@@ -16,10 +16,7 @@ class Node(Vertex):
     @property
     def label(self):
         if self.data:
-            if hasattr(self.data,'identifier'):
-                return self.data.identifier
-            else:
-                return self.data
+            return self.data.identifier if hasattr(self.data,'identifier') else self.data
         return None
 
     def is_ccore(self):
@@ -27,20 +24,15 @@ class Node(Vertex):
 
     def loc(self,pre=""):
         i = self.index
-        if i is None:
-            si = hex(id(self))
-        else:
-            si = "%s%d"%(pre,i)
-        return si
+        return hex(id(self)) if i is None else "%s%d"%(pre,i)
 
     def __repr__(self):
         i = self.loc("v")
         n = self.label
         if n is None:
-            return "<Node %s, data: None>"%i
-        else:
-            t = self.data.__class__.__name__
-            return "<Node %s, data: '%s' (%s)>"%(i,n,t)
+            return f"<Node {i}, data: None>"
+        t = self.data.__class__.__name__
+        return f"<Node {i}, data: '{n}' ({t})>"
 
 
 class Link(Edge):
@@ -57,7 +49,7 @@ class Link(Edge):
 
     def __repr__(self):
         n0, n1 = [v.loc("v") for v in self.v]
-        return "<Link @ %s, %s -> %s>"%(hex(id(self)),n0,n1)
+        return f"<Link @ {hex(id(self))}, {n0} -> {n1}>"
 
 
 class CGraph(Graph):
@@ -66,7 +58,7 @@ class CGraph(Graph):
     """
 
     def __repr__(self):
-        return "<CGraph @ %s, C: %s>"%(hex(id(self)),str([g.order() for g in self.C]))
+        return f"<CGraph @ {hex(id(self))}, C: {[g.order() for g in self.C]}>"
 
 
 def build(obj,db,V=None,g=None):
@@ -167,7 +159,7 @@ def get_typegraph_cycles_params(g,r=None):
                 # lets compute its cycles:
                 p = get_scs_params(l)
                 if p is not None:
-                    X.update(p)
+                    X |= p
     return X
 
 from itertools import tee
@@ -203,9 +195,7 @@ def get_cycles(obj,db,psize=4):
     X = get_typegraph_cycles_params(g)
     R = {}
     for v0,params in X.items():
-        RL = []
-        for P in params:
-            RL.append(get_cycle_offsets(v0,db,P,psize))
+        RL = [get_cycle_offsets(v0,db,P,psize) for P in params]
         R[v0.data.identifier] = RL
     return R
 

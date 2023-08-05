@@ -76,7 +76,7 @@ def FuncDecl(cur, cxx, errors=None):
     f = cFunc(prototype=proto)
     for e in cur.get_children():
         if conf.DEBUG:
-            echo("%s: %s" % (e.kind, e.spelling))
+            echo(f"{e.kind}: {e.spelling}")
         if e.kind == CursorKind.PARM_DECL:
             params.append(e.spelling)
         elif e.kind == CursorKind.COMPOUND_STMT:
@@ -85,22 +85,23 @@ def FuncDecl(cur, cxx, errors=None):
     f["locs"] = locs
     f["calls"] = calls
     if conf.VERBOSE:
-        secho("  cFunc: %s" % identifier)
+        secho(f"  cFunc: {identifier}")
     return identifier, f
 
 
 @declareHandler(MACRO_DEF)
 def MacroDef(cur, cxx, errors=None):
-    if cur.extent.start.file:
-        identifier = cur.spelling
-        toks = []
-        for t in list(cur.get_tokens())[1:]:
-            pre = "" if t.spelling in spec_chars else " "
-            toks.append(pre + t.spelling)
-        s = "".join(toks)
-        if conf.VERBOSE:
-            secho("  cMacro: %s" % identifier)
-        return identifier, cMacro(s.replace("( ", "("))
+    if not cur.extent.start.file:
+        return
+    identifier = cur.spelling
+    toks = []
+    for t in list(cur.get_tokens())[1:]:
+        pre = "" if t.spelling in spec_chars else " "
+        toks.append(pre + t.spelling)
+    s = "".join(toks)
+    if conf.VERBOSE:
+        secho(f"  cMacro: {identifier}")
+    return identifier, cMacro(s.replace("( ", "("))
 
 
 @declareHandler(TYPEDEF_DECL)
@@ -118,9 +119,9 @@ def TypeDef(cur, cxx, errors=None):
     elif t.startswith("struct const "):
         t = t.replace("struct const ","")
     if conf.DEBUG:
-        echo("\t" * g_indent + "make unique: %s" % t)
+        echo("\t" * g_indent + f"make unique: {t}")
     if conf.VERBOSE:
-        secho("  cTypedef: %s" % identifier)
+        secho(f"  cTypedef: {identifier}")
     return identifier, cTypedef(t)
 
 
@@ -132,68 +133,62 @@ def TypeRef(cur, cxx, errors=None):
 
 @declareHandler(STRUCT_DECL)
 def StructDecl(cur, cxx, errors=None):
-    typename = cur.type.spelling
-    if cxx:
-        typename = cur.type.get_canonical().spelling
+    typename = cur.type.get_canonical().spelling if cxx else cur.type.spelling
     if not typename.startswith("struct "):
-        typename = "struct " + typename
+        typename = f"struct {typename}"
     typename = get_uniq_typename(typename)
     if conf.DEBUG:
-        echo("\t" * g_indent + "make unique: %s" % typename)
+        echo("\t" * g_indent + f"make unique: {typename}")
     S = cClass() if cxx else cStruct()
     SetStructured(cur, S, errors)
     if conf.VERBOSE:
-        secho("  %s: %s" % (S.__class__.__name__, typename))
+        secho(f"  {S.__class__.__name__}: {typename}")
     return typename, S
 
 
 @declareHandler(UNION_DECL)
 def UnionDecl(cur, cxx, errors=None):
-    typename = cur.type.spelling
-    if cxx:
-        typename = cur.type.get_canonical().spelling
+    typename = cur.type.get_canonical().spelling if cxx else cur.type.spelling
     if not typename.startswith("union "):
-        typename = "union " + typename
+        typename = f"union {typename}"
     typename = get_uniq_typename(typename)
     if conf.DEBUG:
-        echo("\t" * g_indent + "make unique: %s" % typename)
+        echo("\t" * g_indent + f"make unique: {typename}")
     S = cClass() if cxx else cUnion()
     SetStructured(cur, S, errors)
     if conf.VERBOSE:
-        secho("  %s: %s" % (S.__class__.__name__, typename))
+        secho(f"  {S.__class__.__name__}: {typename}")
     return typename, S
 
 
 @declareHandler(CLASS_DECL)
 def ClassDecl(cur, cxx, errors=None):
-    typename = "class %s" % (cur.type.get_canonical().spelling)
+    typename = f"class {cur.type.get_canonical().spelling}"
     if conf.DEBUG:
-        echo("\t" * g_indent + "%s" % typename)
+        echo("\t" * g_indent + f"{typename}")
     S = cClass()
     SetStructured(cur, S, errors)
     if conf.VERBOSE:
-        secho("  %s: %s" % (S.__class__.__name__, typename))
+        secho(f"  {S.__class__.__name__}: {typename}")
     return typename, S
 
 
 @declareHandler(ENUM_DECL)
 def EnumDecl(cur, cxx, errors=None):
     global g_indent
-    typename = cur.type.spelling
-    if cxx:
-        typename = cur.type.get_canonical().spelling
+    typename = cur.type.get_canonical().spelling if cxx else cur.type.spelling
     if not typename.startswith("enum "):
-        typename = "enum " + typename
+        typename = f"enum {typename}"
     typename = get_uniq_typename(typename)
     if conf.DEBUG:
-        echo("\t" * g_indent + "make unique: %s" % typename)
+        echo("\t" * g_indent + f"make unique: {typename}")
     S = cEnum()
     S._in = str(cur.extent.start.file)
     # a = 0
     g_indent += 1
     for f in cur.get_children():
         if conf.DEBUG:
-            echo("\t" * g_indent + "%s: " % (f.kind), nl=False)
+            echo("\t" * g_indent + f"{f.kind}: ", nl=False)
         # if not f.is_definition():
         #    if a: raise ValueError
         if f.kind is CursorKind.ENUM_CONSTANT_DECL:
@@ -201,10 +196,10 @@ def EnumDecl(cur, cxx, errors=None):
             if conf.DEBUG:
                 echo(str(f.enum_value), nl=False)
         elif conf.DEBUG:
-            echo("%s:%s" % (f.kind, f.spelling))
+            echo(f"{f.kind}:{f.spelling}")
     g_indent -= 1
     if conf.VERBOSE:
-        secho("  %s: %s" % (S.__class__.__name__, typename))
+        secho(f"  {S.__class__.__name__}: {typename}")
     return typename, S
 
 
@@ -214,9 +209,9 @@ def ClassTemplate(cur, cxx, errors=None):
     p = []
     for x in cur.get_children():
         if x.kind == CursorKind.TEMPLATE_TYPE_PARAMETER:
-            p.append("typename %s" % x.spelling)
+            p.append(f"typename {x.spelling}")
         elif x.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER:
-            p.append("%s %s" % (x.type.spelling, x.spelling))
+            p.append(f"{x.type.spelling} {x.spelling}")
     # now we need this to distinguish struct/union/class template:
     # damn libclang!! children here should really allow for
     # this by having a STRUCT_DECL, UNION_DECL or CLASS_DECL !
@@ -228,14 +223,14 @@ def ClassTemplate(cur, cxx, errors=None):
         k = toks[i - 1]
     except ValueError:
         k = "struct"
-    identifier = "%s %s" % (k, identifier)
+    identifier = f"{k} {identifier}"
     if conf.DEBUG:
         echo("\t" * g_indent + str(identifier))
     # ok so now proceed with the "class" parsing:
     S = cClass()
     SetStructured(cur, S, errors)
     if conf.VERBOSE:
-        secho("  cTemplate/%s: %s" % (S.__class__.__name__, identifier))
+        secho(f"  cTemplate/{S.__class__.__name__}: {identifier}")
     return identifier, cTemplate(params=p, cClass=S)
 
 
@@ -250,12 +245,12 @@ def FuncTemplate(cur, cxx, errors=None):
     p = []
     for x in cur.get_children():
         if x.kind == CursorKind.TEMPLATE_TYPE_PARAMETER:
-            p.append("typename %s" % x.spelling)
+            p.append(f"typename {x.spelling}")
         elif x.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER:
-            p.append("%s %s" % (x.type.spelling, x.spelling))
+            p.append(f"{x.type.spelling} {x.spelling}")
     f = re.sub(r"__attribute__.*", "", proto)
     if conf.VERBOSE:
-        secho("  cTemplate/cFunc: %s" % identifier)
+        secho(f"  cTemplate/cFunc: {identifier}")
     return identifier, cTemplate(params=p, cFunc=cFunc(prototype=f))
 
 
@@ -284,11 +279,11 @@ def NameSpace(cur, cxx, errors=None):
         if f.kind in CHandlers:
             i, obj = CHandlers[f.kind](f, cxx, errors)
             if S.inline:
-                i = i.replace("%s::" % namespace, "")
+                i = i.replace(f"{namespace}::", "")
             S.append(i)
             S.local[i] = obj
     if conf.VERBOSE:
-        secho("  %s: %s" % (S.__class__.__name__, namespace))
+        secho(f"  {S.__class__.__name__}: {namespace}")
     return namespace, S
 
 
@@ -300,7 +295,7 @@ def CodeDef(cur, cxx, errors=None):
     # for f in deepflatten(cur):
     for f in cur.walk_preorder():
         if conf.DEBUG:
-            echo("\t" * g_indent + "%s: %s" % (f.kind, f.spelling))
+            echo("\t" * g_indent + f"{f.kind}: {f.spelling}")
         if f.kind == CursorKind.VAR_DECL:
             locs.append((f.type.spelling, f.spelling))
             if conf.DEBUG:
@@ -334,7 +329,7 @@ def SetStructured(cur, S, errors=None):
         if conf.DEBUG:
             echo("\t" * g_indent + str(f.kind) + "=" + str(f.spelling))
         errs = []
-        for i, r in enumerate(errors):
+        for r in errors:
             if f.extent.start.line <= r.location.line <= f.extent.end.line:
                 if (f.extent.start.line != f.extent.end.line) or (
                     f.extent.start.column <= r.location.column <= f.extent.end.column
@@ -346,8 +341,8 @@ def SetStructured(cur, S, errors=None):
             off = alltoks.index(T[0])
             fix = None
             for k, s, l in alltoks[off:]:
-                if k == TokenKind.PUNCTUATION and s == ";":
-                    if l.offset > T[-1][2].offset:
+                if l.offset > T[-1][2].offset:
+                    if k == TokenKind.PUNCTUATION and s == ";":
                         fix = l.offset
                         break
             if fix is not None:
@@ -368,7 +363,10 @@ def SetStructured(cur, S, errors=None):
             if f.kind == FUNC_TEMPLATE:
                 S.append(
                     (
-                        ("template%s" % slocal.get_template(), slocal["cFunc"]["prototype"]),
+                        (
+                            f"template{slocal.get_template()}",
+                            slocal["cFunc"]["prototype"],
+                        ),
                         ("", identifier),
                         (f.access_specifier.name, ""),
                     )
@@ -378,7 +376,6 @@ def SetStructured(cur, S, errors=None):
                 attr_x = True
                 if not S._is_class:
                     S.append([identifier, "", ""])
-        # c++ parent class:
         elif f.kind is CursorKind.CXX_BASE_SPECIFIER:
             is_virtual = clang.cindex.conf.lib.clang_isVirtualBase(f)
             virtual = "virtual" if is_virtual else ""
@@ -386,7 +383,6 @@ def SetStructured(cur, S, errors=None):
             S.append(
                 (("parent", virtual), ("", f.spelling), (f.access_specifier.name, ""))
             )
-        # c++ 'using' declaration:
         elif f.kind is CursorKind.USING_DECLARATION:
             uses = []
             name = ""
@@ -396,9 +392,8 @@ def SetStructured(cur, S, errors=None):
                 if x.kind == CursorKind.OVERLOADED_DECL_REF:
                     name = x.spelling
             if conf.DEBUG:
-                echo("\t" * g_indent + "%s : %s" % (name, uses))
+                echo("\t" * g_indent + f"{name} : {uses}")
             S.append((("using", uses), ("", name), ("", "")))
-        # structured type member:
         else:
             try:
                 comment = f.brief_comment or f.raw_comment
@@ -416,20 +411,22 @@ def SetStructured(cur, S, errors=None):
                 CursorKind.CXX_METHOD,
             ):
                 t = f.type.spelling
-                if "(anonymous" in t:
-                    if not S._is_class:
-                        t = f.type.get_canonical().spelling
-                elif "(unnamed" in t:
-                    if not S._is_class:
-                        t = f.type.get_canonical().spelling
-                else:
+                if (
+                    "(anonymous" in t
+                    and not S._is_class
+                    or "(anonymous" not in t
+                    and "(unnamed" in t
+                    and not S._is_class
+                ):
+                    t = f.type.get_canonical().spelling
+                elif "(anonymous" not in t and "(unnamed" not in t:
                     if S._is_class:
                         kind = get_kind_type(t)
                         t = f.type.get_canonical().spelling
                         if "type-parameter" in t:
                             t = f.type.spelling
                         if kind:
-                            t = "%s %s" % (kind, t)
+                            t = f"{kind} {t}"
                     t = fix_type_conversion(f, t, S._is_class, errs)
                 t = get_uniq_typename(t)
                 attr = ""
@@ -447,7 +444,7 @@ def SetStructured(cur, S, errors=None):
                         g_indent += 1
                         subk = w.kind
                         subs = w.spelling
-                        echo("\t" * g_indent + "%s: %s" % (subk, subs))
+                        echo("\t" * g_indent + f"{subk}: {subs}")
                         g_indent -= 1
                     if w.kind == CursorKind.CXX_FINAL_ATTR:
                         attr += ", final"
@@ -483,31 +480,30 @@ def SetStructured(cur, S, errors=None):
 
 def get_kind_type(t):
     if "struct " in t:
-        kind = "struct"
+        return "struct"
     elif "union " in t:
-        kind = "union"
+        return "union"
     elif "enum " in t:
-        kind = "enum"
+        return "enum"
     else:
-        kind = ""
-    return kind
+        return ""
 
 
 def get_uniq_typename(t):
-    if not (("(anonymous" in t) or ("(unnamed" in t)):
+    if "(anonymous" not in t and "(unnamed" not in t:
         return t
     kind = get_kind_type(t)
     # anon types inside *named* struct/union are prefixed by
     # the struct/union namespace, we don't keep this since
     # we are creating a unique typename anyway
     if "::" in t:
-        t = "%s %s" % (kind, t.split("::")[-1])
+        t = f'{kind} {t.split("::")[-1]}'
     x = re.compile(r"\((anonymous|unnamed) .*\)")
-    s = x.search(t).group(0)
+    s = x.search(t)[0]
     h = hashlib.sha256(s.encode("ascii")).hexdigest()[:8]
     if not t.startswith(kind):
-        t = "%s %s" % (kind, t)
-    return re.sub(r"\((anonymous|unnamed) .*\)", "?_%s" % h, t, count=1)
+        t = f"{kind} {t}"
+    return re.sub(r"\((anonymous|unnamed) .*\)", f"?_{h}", t, count=1)
 
 
 def fix_type_conversion(f, t, cxx, errs):
@@ -544,9 +540,9 @@ def fix_type_conversion(f, t, cxx, errs):
             return t
         marks = [""]
         if conf.DEBUG:
-            secho("candidates: %s" % candidates, fg="magenta")
+            secho(f"candidates: {candidates}", fg="magenta")
         # for every occurence of int type in t:
-        T = [x for x in f.get_tokens()]
+        T = list(f.get_tokens())
         fixbitfield = ""
         for _ in re.finditer(r"(?<!\w)int(?!\w)", t):
             # lets see if this was diag-ed has an 'unknown type' error:
@@ -556,10 +552,10 @@ def fix_type_conversion(f, t, cxx, errs):
             # corresponding type. Either based on error location (column) or
             # by counting 'int' occurences within f's tokens up to the point
             # where the type string is located...
-            while len(T) > 0:
+            while T:
                 x = T.pop(0)
                 if conf.DEBUG:
-                    secho("%s: %s" % (x.kind, x.spelling), fg="red")
+                    secho(f"{x.kind}: {x.spelling}", fg="red")
                 if x.kind == TokenKind.KEYWORD:
                     if x.spelling == "int":
                         marks.append("int")
@@ -569,24 +565,24 @@ def fix_type_conversion(f, t, cxx, errs):
                         if x.spelling in c:
                             if c.endswith("~"):
                                 c = c[:-1]
-                                while len(T) > 0 and T[0].spelling == "::":
+                                while T and T[0].spelling == "::":
                                     x = T.pop(0)
                                     x = T.pop(0)
-                                    c += "::%s" % (x.spelling)
+                                    c += f"::{x.spelling}"
                             marks.append(c)
                             break
                 elif x.kind == TokenKind.PUNCTUATION and x.spelling == ":":
-                    fixbitfield = "#{}".format(T[0].spelling)
+                    fixbitfield = f"#{T[0].spelling}"
         st = re.split(r"(?<!\w)int(?!\w)", t)
         d = len(st) - len(marks)
         if d > 0:
-            marks = marks + (["int"] * d)
+            marks += ["int"] * d
         ct = ""
         for m, s in zip(marks, st):
             ct = ct + m + s
         t = ct + fixbitfield
     if conf.DEBUG:
-        echo("\t" * g_indent + "type: %s" % t)
+        echo("\t" * g_indent + f"type: {t}")
     return t
 
 
@@ -624,15 +620,15 @@ def parse(filename, args=None, unsaved_files=None, options=None, kind=None, tag=
     if conf.config is None:
         conf.config = conf.Config()
     cxx_args = ["-x", "c++", "-std=c++11", "-fno-delayed-template-parsing"]
-    if conf.config.Collect.cxx:
-        if filename.endswith(".hpp") or filename.endswith(".cpp"):
+    if filename.endswith(".hpp") or filename.endswith(".cpp"):
+        if conf.config.Collect.cxx:
             _args.extend(cxx_args)
     cxx = "c++" in _args
     if not conf.config.Collect.strict:
         # in non strict mode, we allow missing includes
         fd, depf = tempfile.mkstemp(prefix="ccrawl-")
         os.close(fd)
-        _args += ["-M", "-MG", "-MF%s" % depf]
+        _args += ["-M", "-MG", f"-MF{depf}"]
     if conf.DEBUG:
         echo("\nfilename: %s, args: %s" % (filename, _args))
     if unsaved_files is None:
@@ -696,7 +692,7 @@ def parse(filename, args=None, unsaved_files=None, options=None, kind=None, tag=
     diag = {}
     for r in tu.diagnostics:
         if selected_errs(r):
-            if not r.location.file.name in diag:
+            if r.location.file.name not in diag:
                 diag[r.location.file.name] = defaultdict(list)
             diag[r.location.file.name][r.location.line].append(r)
     # map diagnostics to cursors:
@@ -714,9 +710,7 @@ def parse(filename, args=None, unsaved_files=None, options=None, kind=None, tag=
             echo("-" * 80)
             echo("%s: %s [%d errors]" % (cur.kind, cur.spelling, len(errs)))
         if cur.kind in kind:
-            kv = CHandlers[cur.kind](cur, cxx, errs)
-            # fill defs with collected cursors:
-            if kv:
+            if kv := CHandlers[cur.kind](cur, cxx, errs):
                 ident, cobj = kv
                 if cobj:
                     for x in cobj.to_db(ident, tag, cur.location.file.name):
@@ -724,9 +718,9 @@ def parse(filename, args=None, unsaved_files=None, options=None, kind=None, tag=
     if not conf.QUIET:
         secho(("[%3d]" % len(defs)).rjust(12), fg="green" if not cxx else "cyan")
         for i in diag_get_missing(filename, tu):
-            secho("       %s"%i,fg="red")
+            secho(f"       {i}", fg="red")
         for i in diag_get_incs(filename, tu):
-            secho("       %s"%i[0],fg="magenta")
+            secho(f"       {i[0]}", fg="magenta")
     return defs.values()
 
 
@@ -740,7 +734,7 @@ def parse_string(s, args=None, options=0):
 
 
 def selected_errs(r):
-    if (
+    return (
         "unknown type name" in r.spelling
         or "use of undeclared identifier" in r.spelling
         or "type specifier missing" in r.spelling
@@ -748,10 +742,7 @@ def selected_errs(r):
         or "no type named" in r.spelling
         or "function cannot return function type" in r.spelling
         or "no template named" in r.spelling
-    ):
-        return True
-    else:
-        return False
+    )
 
 
 def parse_debug(filename, cxx=False):
@@ -771,7 +762,7 @@ def parse_debug(filename, cxx=False):
         "-fmodules",
         "-fbuiltin-module-map",
     ]
-    _args += ["-M", "-MG", "-MF%s" % ".depf"]
+    _args += ["-M", "-MG", '-MF.depf']
     if cxx:
         _args += ["-x", "c++", "-std=c++11", "-fno-delayed-template-parsing"]
     _args += [
@@ -791,7 +782,7 @@ def parse_debug(filename, cxx=False):
     diag = {}
     for r in tu.diagnostics:
         if selected_errs(r):
-            if not r.location.file.name in diag:
+            if r.location.file.name not in diag:
                 diag[r.location.file.name] = defaultdict(list)
             diag[r.location.file.name][r.location.line].append(r)
     for cur, errs in pool:
@@ -808,8 +799,7 @@ def parse_debug(filename, cxx=False):
             echo("-" * 80)
             echo("%s: %s [%d errors]" % (cur.kind, cur.spelling, len(errs)))
         if cur.kind in CHandlers:
-            kv = CHandlers[cur.kind](cur, cxx, errs)
-            if kv:
+            if kv := CHandlers[cur.kind](cur, cxx, errs):
                 ident, cobj = kv
                 if cobj:
                     for x in cobj.to_db(ident, "debug", cur.location.file.name):

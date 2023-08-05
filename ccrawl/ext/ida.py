@@ -11,8 +11,7 @@ except ImportError:
 else:
 
     def build(obj):
-        err = parse_decls(obj.show(db, set(), form="C"))
-        if err:
+        if err := parse_decls(obj.show(db, set(), form="C")):
             secho("parse_decls returns with %d errors" % err)
             return None
         name = obj.identifier

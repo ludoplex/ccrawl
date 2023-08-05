@@ -122,11 +122,11 @@ class c_type(object):
                 lbase.append(w)
         self.lbase = " ".join(lbase)
         r = r.replace("[]", "*")
-        r = "(%s)" % r
+        r = f"({r})"
         try:
             nest = nested_c.parseString(r).asList()[0]
         except Exception as e:
-            print("c_type: error while parsing '%s'" % r)
+            print(f"c_type: error while parsing '{r}'")
             raise e
         self.pstack = pstack(nest, self.__class__)
 
@@ -143,7 +143,7 @@ class c_type(object):
         return 0
 
     def __repr__(self):
-        s = ["<%s" % self.__class__.__name__]
+        s = [f"<{self.__class__.__name__}"]
         s.extend(reversed([str(p) for p in self.pstack]))
         if self.lconst:
             s.append("const ")
@@ -176,10 +176,10 @@ class c_type(object):
         stripok = False
         for p in reversed(self.pstack):
             if p.is_ptr:
-                s = "({}{})".format(p, s)
+                s = f"({p}{s})"
                 stripok = True
             else:
-                s = "{}{}".format(s, str(p))
+                s = f"{s}{str(p)}"
                 stripok = False
         if stripok:
             s = s[1:-1]
@@ -191,7 +191,7 @@ class c_type(object):
         name parameter for a function's prototype.
         """
         extra = " : %d" % self.lbfw if self.lbfw else ""
-        s = ("%s %s" % (self.show_base(), self.show_ptr(name))).strip()
+        s = f"{self.show_base()} {self.show_ptr(name)}".strip()
         return s + extra
 
 
@@ -237,10 +237,10 @@ class cxx_type(c_type):
         stripok = False
         for p in reversed(self.pstack):
             if p.is_ptr:
-                s = "({}{})".format(p, s)
+                s = f"({p}{s})"
                 stripok = True
             else:
-                s = "{}{}".format(s, str(p))
+                s = f"{s}{str(p)}"
                 stripok = False
         if stripok:
             s = s[1:-1]
@@ -248,7 +248,7 @@ class cxx_type(c_type):
 
     def show(self, name="", kw=True, ns=True):
         extra = " : %d" % self.lbfw if self.lbfw else ""
-        s = ("%s %s" % (self.show_base(kw, ns), self.show_ptr(name))).strip()
+        s = f"{self.show_base(kw, ns)} {self.show_ptr(name)}".strip()
         return s + extra
 
 
@@ -269,8 +269,8 @@ class ptr(object):
         self.p, self.const = p, c
 
     def __str__(self):
-        sfx = "%s " % self.const if self.const else ""
-        return "{}{}".format(self.p, sfx)
+        sfx = f"{self.const} " if self.const else ""
+        return f"{self.p}{sfx}"
 
 
 class arr(object):
@@ -285,7 +285,7 @@ class arr(object):
         self.a = a
 
     def __str__(self):
-        return "[%s]" % self.a
+        return f"[{self.a}]"
 
 
 class fargs(object):
@@ -314,9 +314,7 @@ class fargs(object):
         return list(filter(None, A))
 
     def __str__(self):
-        if hasattr(self, "cvr"):
-            return "%s %s" % (self.f, self.cvr)
-        return self.f
+        return f"{self.f} {self.cvr}" if hasattr(self, "cvr") else self.f
 
 
 def pstack(plist, cls=c_type):
@@ -335,19 +333,18 @@ def pstack(plist, cls=c_type):
                 S.append(ptr(*p))
             if a:
                 S.append(arr(a))
-            if not (p or a):
-                if cxx:
-                    r, a = pointerxx.parseString(p0)
-                    if r:
-                        S.append(ptr(r[0], ""))
-                    if a:
-                        S.append(arr(a))
-                    plist.pop(0)
-                else:
-                    S.append(fargs(flatten(plist)))
-                    plist = []
-            else:
+            if p or a:
                 plist.pop(0)
+            elif cxx:
+                r, a = pointerxx.parseString(p0)
+                if r:
+                    S.append(ptr(r[0], ""))
+                if a:
+                    S.append(arr(a))
+                plist.pop(0)
+            else:
+                S.append(fargs(flatten(plist)))
+                plist = []
         if len(plist) == 1 and len(plist[0]) == 0:
             S.append(fargs("()"))
             return S
@@ -367,10 +364,10 @@ def pstack(plist, cls=c_type):
             plist = plist[0]
         S.extend(pstack(plist))
     if cvr:
-        if len(S) > 0:
+        if S:
             S[-1].cvr = cvr
         else:
-            print("cvr %s but S is empty!" % cvr)
+            print(f"cvr {cvr} but S is empty!")
     return S
 
 
@@ -381,7 +378,7 @@ def flatten(args):
             s.append(x)
         else:
             s.append(flatten(x))
-    return "(%s)" % (" ".join(s))
+    return f'({" ".join(s)})'
 
 
 def indent(txt, l=4):

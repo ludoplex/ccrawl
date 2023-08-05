@@ -67,9 +67,7 @@ else:
             TypeDefine(name, sz)
             Consts.All[name] = {}.update(obj)
         elif obj._is_struct or obj._is_union:
-            define = StructDefine
-            if obj._is_union:
-                define = UnionDefine
+            define = UnionDefine if obj._is_union else StructDefine
             cls = type(name, (StructFormatter,), {})
             fmt = []
             # if the structure is a bitfield, we
@@ -88,7 +86,7 @@ else:
                 if not n and not r.lbase.startswith("union "):
                     continue
                 rt, t = fieldformat(r)
-                fmt.append("{} : {} ;{}".format(rt or t, n, c or ""))
+                fmt.append(f'{rt or t} : {n} ;{c or ""}')
             fmt.extend(format_bitfield(bfmt))
             fmt = "\n".join(fmt)
             define(fmt)(cls)
@@ -117,11 +115,11 @@ else:
             rt, t = fieldformat(r)
             n = "/".join(ln)
             t += "".join(["/%d" % x.lbfw for x in lt[1:]])
-            fmt.append("{} : {} ;{}".format(t, n, ""))
+            fmt.append(f"{t} : {n} ;")
         return fmt
 
 def get_c_or_cxx_type(x):
-    if not (('&' in x) or ('::' in x)):
+    if '&' not in x and '::' not in x:
         try:
             t = c_type(x)
         except pp.ParseException:
@@ -172,27 +170,22 @@ def to_ccore(ax,identifier,**kargs):
         t = ax.fields[0].typename
         if t in A_to_C:
             t = A_to_C[t]
-        else:
-            if t in Alltypes:
-                subs.append(to_ccore(Alltypes[t],t))
+        elif t in Alltypes:
+            subs.append(to_ccore(Alltypes[t],t))
         c = ccore.getcls("cTypedef")(t)
     else:
-        if not ax.union:
-            c = ccore.getcls("cStruct")()
-        else:
-            c = ccore.getcls("cUnion")()
+        c = ccore.getcls("cStruct")() if not ax.union else ccore.getcls("cUnion")()
         ccore.unfold(c,None)
         for f in ax.fields:
             t = f.typename
             if t in A_to_C:
                 t = A_to_C[t]
-            else:
-                if t in Alltypes:
-                    subs.append(to_ccore(Alltypes[t],t))
+            elif t in Alltypes:
+                subs.append(to_ccore(Alltypes[t],t))
             if hasattr(f,'subnames'):
                 for sn,ss in zip(f.subnames,f.subsizes):
                     if sn=="_":
-                        sn = "reserved_%s"%__r
+                        sn = f"reserved_{__r}"
                         __r+=1
                     c.append([t+' # %d'%ss, sn, f.comment])
             else:

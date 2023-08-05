@@ -18,12 +18,12 @@ def c_headers():
 
 @pytest.fixture
 def c_empty():
-    return samples_dir + "/00_empty.h"
+    return f"{samples_dir}/00_empty.h"
 
 
 @pytest.fixture
 def c_header():
-    return samples_dir + "/header.h"
+    return f"{samples_dir}/header.h"
 
 
 @pytest.fixture
@@ -92,13 +92,12 @@ def cxx_sources():
 
 @pytest.fixture
 def db_doc1():
-    doc = {"id": "xxx", "cls": "cTypedef", "val": "int"}
-    return doc
+    return {"id": "xxx", "cls": "cTypedef", "val": "int"}
 
 
 @pytest.fixture
 def db_doc2():
-    docs = [
+    return [
         {
             "id": "struct X",
             "cls": "cStruct",
@@ -106,7 +105,6 @@ def db_doc2():
         },
         {"id": "yyyy", "cls": "cTypedef", "val": "int *"},
     ]
-    return docs
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -123,7 +121,7 @@ c.Database.url   = 'mongodb://localhost:27017'
     try:
         os.write(fd, bytes(S, "ascii"))
     except TypeError:
-        os.write(fd, str(S))
+        os.write(fd, S)
     os.close(fd)
     yield fname
     os.remove(fname)

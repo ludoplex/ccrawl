@@ -82,8 +82,7 @@ class ccore(object):
         """
         x = ccore._cache_.get(elt, None)
         if x is None:
-            data = db.get(where("id") == elt)
-            if data:
+            if data := db.get(where("id") == elt):
                 x = ccore.from_db(data)
                 ccore._cache_[elt] = x
             else:
@@ -114,7 +113,7 @@ class ccore(object):
             form (str): name of a module in the formatters sub-package.
                         If the module is not found, 'raw' is used.
         """
-        ff = "{}_{}".format(cls.__name__, form)
+        ff = f"{cls.__name__}_{form}"
         try:
             cls.formatter = getattr(formatters, ff)
         except AttributeError:
@@ -252,12 +251,7 @@ class cStruct(list, ccore):
         return self
 
     def index_of(self,n):
-        i=0
-        for f in self:
-            if f[1]==n:
-                return i
-            i += 1
-        return None
+        return next((i for i, f in enumerate(self) if f[1]==n), None)
 
     def __eq__(self, other):
         return list(self) == list(other)
@@ -349,7 +343,7 @@ class cClass(list, ccore):
                 except Exception:
                     pass
                 if x is None:
-                    raise TypeError("unkown type '%s'" % n)
+                    raise TypeError(f"unkown type '{n}'")
                 assert x._is_class
                 # get layout of the parent class:
                 vtbl, m, v = x.cStruct_build_info(db)
@@ -363,7 +357,7 @@ class cClass(list, ccore):
                         if len(m) > 0:
                             if not m[0][1].startswith("__vptr"):
                                 t = cxx_type("void *")
-                                M.append((t, "__vptr$%s" % nn))
+                                M.append((t, f"__vptr${nn}"))
                     M.extend(m)
                 V.update(v)
             elif qal == "using":
@@ -381,10 +375,7 @@ class cClass(list, ccore):
         Creates a cStruct instance that correspond to this C++ class,
         according the gcc cxx ABI for virtual classes.
         """
-        if self.identifier.startswith("union "):
-            x = cUnion()
-        else:
-            x = cStruct()
+        x = cUnion() if self.identifier.startswith("union ") else cStruct()
         name = cxx_type(self.identifier)
         x.identifier = "struct __layout$%s"%(name.show_base(kw=False,ns=True))
         # now get the structure information for this class:
@@ -393,13 +384,13 @@ class cClass(list, ccore):
         if len(M) > 0 and vptr:
             if not M[0][1].startswith("__vptr"):
                 n = cxx_type(self.identifier)
-                x.append(("void *", "__vptr$%s" % n.show_base(), ""))
+                x.append(("void *", f"__vptr${n.show_base()}", ""))
         for t, n in M:
             x.append((t.show(), n, ""))
         for nn, v in V.items():
             vptr, m = v
             if vptr:
-                x.append(("void *", "__vptr$%s" % nn, ""))
+                x.append(("void *", f"__vptr${nn}", ""))
             for t, n in m:
                 x.append((t.show(), n, ""))
         return x
@@ -428,12 +419,9 @@ class cClass(list, ccore):
                 s = ""
                 if t:
                     s += " virtual"
-                s += " %s %s" % (p.lower(), n.show_base())
+                s += f" {p.lower()} {n.show_base()}"
                 spe.append(s)
-        if len(spe) > 0:
-            return " :" + (",".join(spe))
-        else:
-            return ""
+        return " :" + (",".join(spe)) if spe else ""
 
     def __eq__(self, other):
         return list(self) == list(other)
@@ -467,12 +455,7 @@ class cUnion(list, ccore):
         return self
 
     def index_of(self,n):
-        i=0
-        for f in self:
-            if f[1]==n:
-                return i
-            i += 1
-        return None
+        return next((i for i, f in enumerate(self) if f[1]==n), None)
 
     def __eq__(self, other):
         return list(self) == list(other)
@@ -515,9 +498,7 @@ class cFunc(dict, ccore):
 
     def argtypes(self):
         t = c_type(self["prototype"])
-        if len(t.pstack)>0:
-            return t.pstack[-1].args
-        return []
+        return t.pstack[-1].args if len(t.pstack)>0 else []
 
     def unfold(self, db, limit=None):
         if self.subtypes is None:
@@ -554,7 +535,7 @@ class cTemplate(dict, ccore):
         return self.identifier[:i]
 
     def get_template(self):
-        return "<%s>" % (",".join(self["params"]))
+        return f'<{",".join(self["params"])}>'
 
 
 # ------------------------------------------------------------------------------

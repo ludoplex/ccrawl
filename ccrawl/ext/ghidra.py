@@ -97,23 +97,20 @@ else:
                     try:
                         value = int(s[:-1], 0)
                     except ValueError:
-                        secho("macro conversion error for '%s'" % s[:-1], fg="red")
+                        secho(f"macro conversion error for '{s[:-1]}'", fg="red")
                     else:
-                        tr = dtm.startTransaction("equate %s" % obj.identifier)
+                        tr = dtm.startTransaction(f"equate {obj.identifier}")
                         e = eqt.createEquate(obj.identifier, value)
                         dtm.endTransaction(tr, True)
             if e is None:
-                secho(
-                    "macro definition not supported (#define %s '%s')" % (n, s),
-                    fg="magenta",
-                )
+                secho(f"macro definition not supported (#define {n} '{s}')", fg="magenta")
             return e
         x = catp.getDataType(n)
         if x is not None:
-            secho("Data type %s already imported" % n, fg="cyan")
+            secho(f"Data type {n} already imported", fg="cyan")
             return x
         if conf.VERBOSE:
-            secho("building data type %s..." % n, nl=False)
+            secho(f"building data type {n}...", nl=False)
         tr = dtm.startTransaction("build")
         try:
             if obj._is_enum:
@@ -135,12 +132,12 @@ else:
                     dt.setName(n)
                 if obj._is_typedef:
                     if x.__name__ == "LP_CFunctionType":
-                        dt.dataType.setName("proto_%s" % n)
+                        dt.dataType.setName(f"proto_{n}")
                     dt = ghidra.program.model.data.TypedefDataType(n, dt)
                     dt = catp.addDataType(dt, None)
         except Exception as e:
             if conf.VERBOSE:
-                secho("ghidra.build exception: %s" % e, fg="red")
+                secho(f"ghidra.build exception: {e}", fg="red")
             dt = None
         else:
             if conf.VERBOSE:
@@ -160,7 +157,7 @@ else:
     @declareGhidraHandler("Array")
     def dt_Array(cx, dtm):
         if conf.DEBUG:
-            secho("conversion of %s" % cx, fg="cyan")
+            secho(f"conversion of {cx}", fg="cyan")
         t = ctype_to_ghidra(cx._type_, dtm)
         dt = ghidra.program.model.data.ArrayDataType(t, cx._length_, -1)
         dt = catp.addDataType(dt, None)
@@ -169,7 +166,7 @@ else:
     @declareGhidraHandler("_Pointer")
     def dt_Pointer(cx, dtm):
         if conf.DEBUG:
-            secho("conversion of %s" % cx, fg="cyan")
+            secho(f"conversion of {cx}", fg="cyan")
         t = ctype_to_ghidra(cx._type_, dtm)
         dt = ghidra.program.model.data.PointerDataType(t)
         dt = catp.addDataType(dt, None)
@@ -178,7 +175,7 @@ else:
     @declareGhidraHandler("Structure")
     def dt_Structure(cx, dtm):
         if conf.DEBUG:
-            secho("conversion of %s" % cx, fg="cyan")
+            secho(f"conversion of {cx}", fg="cyan")
         sdt = ghidra.program.model.data.StructureDataType(cx.__name__, 0)
         sdt = catp.addDataType(sdt, None)
         sdt.setToDefaultPacking()
@@ -195,9 +192,9 @@ else:
             dt = ctype_to_ghidra(t, dtm)
             if t.__name__ == "LP_CFunctionType":
                 try:
-                    dt.dataType.setName("proto_%s" % n)
+                    dt.dataType.setName(f"proto_{n}")
                 except Exception:
-                    proto = catp.getDataType("proto_%s" % n)
+                    proto = catp.getDataType(f"proto_{n}")
                     dt = ghidra.program.model.data.PointerDataType(proto)
             if bfw > 0:
                 sdt.addBitField(dt, bfw, n, "")
@@ -209,16 +206,16 @@ else:
     @declareGhidraHandler("Union")
     def dt_Union(cx, dtm):
         if conf.DEBUG:
-            secho("conversion of %s" % cx, fg="cyan")
+            secho(f"conversion of {cx}", fg="cyan")
         sdt = ghidra.program.model.data.UnionDataType(cx.__name__)
         sdt = catp.addDataType(sdt, None)
         for n, t in cx._fields_:
             dt = ctype_to_ghidra(t, dtm)
             if t.__name__ == "LP_CFunctionType":
                 try:
-                    dt.dataType.setName("proto_%s" % n)
+                    dt.dataType.setName(f"proto_{n}")
                 except Exception:
-                    proto = catp.getDataType("proto_%s" % n)
+                    proto = catp.getDataType(f"proto_{n}")
                     dt = ghidra.program.model.data.PointerDataType(proto)
             sdt.add(dt, -1, n, "")
         return sdt
@@ -226,15 +223,13 @@ else:
     @declareGhidraHandler("CFunctionType")
     def dt_Function(cx, dtm):
         if conf.DEBUG:
-            secho("conversion of %s" % cx, fg="cyan")
+            secho(f"conversion of {cx}", fg="cyan")
         fdt = ghidra.program.model.data.FunctionDefinitionDataType(cx.__name__)
         params = []
-        i = 0
-        for p in cx._argtypes_:
+        for i, p in enumerate(cx._argtypes_):
             dt = ctype_to_ghidra(p, dtm)
             p = ghidra.program.model.data.ParameterDefinitionImpl("p%d" % i, dt, "")
             params.append(p)
-            i += 1
         fdt.setArguments(params)
         if cx._restype_ is not None:
             res = ctype_to_ghidra(cx._restype_, dtm)
@@ -323,7 +318,7 @@ else:
             try:
                 f = getGlobalFunctions(f)[0]
             except Exception:
-                secho("error: function '%s' not found." % f, fg="red")
+                secho(f"error: function '{f}' not found.", fg="red")
                 return None
         opt = ghidra.app.decompiler.DecompileOptions()
         ifc = ghidra.app.decompiler.DecompInterface()
@@ -333,7 +328,7 @@ else:
         res = ifc.decompileFunction(f, 1000, monitor)
         Locs = {}
         if res is None:
-            secho("error: function '%s' not decompiled." % f, fg="red")
+            secho(f"error: function '{f}' not decompiled.", fg="red")
             return Locs
         hf = res.getHighFunction()
         lsm = hf.getLocalSymbolMap()
@@ -341,10 +336,9 @@ else:
             secho("error: High function has no SymbolMap." % f, fg="red")
             return Locs
         for n, s in lsm.getNameToSymbolMap().items():
-            S = []
             t = s.getDataType()
             if conf.DEBUG:
-                secho("\nVariable name & type: '{}' : '{}'".format(n, t), fg="magenta")
+                secho(f"\nVariable name & type: '{n}' : '{t}'", fg="magenta")
             if t.getDescription().startswith("pointer"):
                 hv = s.getHighVariable()
                 vn0 = hv.getRepresentative()
@@ -353,17 +347,18 @@ else:
                 for vn in done:
                     if vn != vn0:
                         todo.append((vn, 0))
-                while len(todo) > 0:
+                S = []
+                while todo:
                     if conf.DEBUG:
-                        secho("todo: {}".format(todo), fg="green")
-                        secho("done: {}".format(done), fg="blue")
+                        secho(f"todo: {todo}", fg="green")
+                        secho(f"done: {done}", fg="blue")
                     cur, off0 = todo.pop(0)
                     if cur is None:
                         continue
                     for p in cur.getDescendants():
                         off = off0
                         if conf.DEBUG:
-                            secho("  pcode: {}".format(p), fg="magenta")
+                            secho(f"  pcode: {p}", fg="magenta")
                         if p.opcode == p.INT_ADD:
                             if p.inputs[1].isConstant():
                                 off += getSigned(p.inputs[1])
@@ -406,7 +401,7 @@ else:
                                 todo.append((p.output, off))
                                 done.append(p.output)
                         if conf.DEBUG:
-                            secho("S = {}".format(S), fg="cyan")
+                            secho(f"S = {S}", fg="cyan")
                 S.sort()
                 Locs[n] = S
         return Locs
@@ -442,7 +437,7 @@ else:
         atr = atm.startTransaction("commit to archive")
         dtr = dtm.startTransaction("update dt synch time")
         try:
-            print("commit '%s' " % (t.getName()), end="")
+            print(f"commit '{t.getName()}' ", end="")
             at = atm.resolve(t, h)
             if at.name != t.name:
                 at.setName(t.name)
@@ -458,9 +453,12 @@ else:
     def commit_local_to_gdt(name):
         dtmservice = ghidra.app.services.DataTypeManagerService
         dtm = currentProgram.getDataTypeManager()
-        Alldtm = {}
-        for adtm in state.getTool().getService(dtmservice).getDataTypeManagers():
-            Alldtm[adtm.name] = adtm
+        Alldtm = {
+            adtm.name: adtm
+            for adtm in state.getTool()
+            .getService(dtmservice)
+            .getDataTypeManagers()
+        }
         sadtm = None
         sa = None
         for a in dtm.sourceArchives:
@@ -492,7 +490,7 @@ def find_functions_with_type(lref,nbfields=-1,sta=None,sto=None):
             break
         if conf.VERBOSE:
             found=False
-            print("%s... "%(f.getName()),end='')
+            print(f"{f.getName()}... ", end='')
         try:
             L = find_auto_structs(f)
         except:
